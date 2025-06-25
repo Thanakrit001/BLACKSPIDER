@@ -1,6 +1,5 @@
 local repo = "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/"
 
--- --- เริ่มต้นส่วนการโหลดไลบรารีที่ปรับปรุงแล้ว ---
 local Library
 local ThemeManager
 local SaveManager
@@ -8,19 +7,18 @@ local SaveManager
 local success, err = pcall(function()
     local libCode = game:HttpGet(repo .. "Library.lua")
     Library = loadstring(libCode)()
-    
+
     local themeCode = game:HttpGet(repo .. "addons/ThemeManager.lua")
     ThemeManager = loadstring(themeCode)()
-    
+
     local saveCode = game:HttpGet(repo .. "addons/SaveManager.lua")
     SaveManager = loadstring(saveCode)()
 end)
 
 if not success then
     warn("Failed to load one or more libraries:", err)
-    return -- หยุดการทำงานของสคริปต์ทั้งหมด
+    return
 end
--- --- สิ้นสุดส่วนการโหลดไลบรารีที่ปรับปรุงแล้ว ---
 
 local Options = Library.Options
 local Toggles = Library.Toggles
@@ -45,64 +43,100 @@ local Tabs = {
 local LeftGroupBox = Tabs.Main:AddLeftGroupbox("Groupbox", "boxes")
 
 LeftGroupBox:AddToggle("MyToggle", {
-    Text = "This is a toggle",
-    Tooltip = "This is a tooltip",
-    DisabledTooltip = "I am disabled!",
+    Text = "นี่คือปุ่มสลับ",
+    Tooltip = "นี่คือคำแนะนำ",
     Default = true,
-    Disabled = false,
     Visible = true,
     Risky = false,
     Callback = function(Value)
-        print("[cb] MyToggle changed to:", Value)
     end,
 })
 
 Toggles.MyToggle:OnChanged(function()
-    print("MyToggle changed to:", Toggles.MyToggle.Value)
 end)
 
 Toggles.MyToggle:SetValue(false)
 
 Library:OnUnload(function()
-    print("Unloaded!")
 end)
 
 ---
 local ShopGroupBox = Tabs.Shop:AddLeftGroupbox("Seed Shop Event", "box")
-local GearShopGroupBox = Tabs.Shop:AddLeftGroupbox("Gear Shop Event", "box") -- เพิ่ม Groupbox สำหรับ Gear Shop
+local GearShopGroupBox = Tabs.Shop:AddLeftGroupbox("Gear Shop Event", "box")
+local EggShopGroupBox = Tabs.Shop:AddLeftGroupbox("Egg Shop Event", "egg")
 
 local autoBuyLowLevelSeedsCoroutine = nil
-local autoBuyHighLevelSeedsCoroutine = nil 
-local autoBuyAllSeedsCoroutine = nil 
-local autoBuyAllGearCoroutine = nil -- เพิ่มตัวแปรสำหรับ Coroutine ของการซื้อเกียร์ทั้งหมด
+local autoBuyHighLevelSeedsCoroutine = nil
+local autoBuyAllSeedsCoroutine = nil
+local autoBuySelectedSeedCoroutine = nil
+local autoBuySelectedGearCoroutine = nil
+local autoBuyAllGearCoroutine = nil
+local autoBuySpecificEggTypeCoroutine = nil
+local autoBuyAllEggsInShopCoroutine = nil
 
-ShopGroupBox:AddToggle("AutoBuyItemA", {
-    Text = "ออโต้ซื้อเมล็ดระดับต่ำ (FLASH SPEED)",
-    Tooltip = "Automatically buys Item A at maximum speed. EXTREME RISK OF DETECTION!",
+local allSeedsList = {
+    "Carrot", "Strawberry", "Blueberry", "Tomato", "Cauliflower",
+    "Watermelon", "Green Apple", "Avocado", "Banana",
+    "Pineapple", "Kiwi", "Bell Pepper", "Prickly Pear",
+    "Loquat", "Feijoa", "Sugar Apple"
+}
+
+ShopGroupBox:AddDropdown("SelectedSeed", {
+    Text = "เลือกเมล็ดที่จะซื้อ",
+    Tooltip = "เลือกเมล็ดพืชเพื่อซื้ออัตโนมัติ",
+    Default = "Carrot",
+    Values = allSeedsList,
+    Callback = function(Value)
+    end,
+})
+
+ShopGroupBox:AddToggle("AutoBuySelectedSeed", {
+    Text = "ออโต้ซื้อเมล็ดที่เลือก",
+    Tooltip = "ซื้อเมล็ดที่เลือกโดยอัตโนมัติด้วยความเร็วสูงสุด เสี่ยงต่อการตรวจจับสูงมาก!",
     Default = false,
     Callback = function(Value)
-        print("[cb] Auto-Buy Item A changed to:", Value)
         if Value then
-            Library:Notify({
-                Title = "Shop",
-                Description = "Auto-Buy Item A ENABLED! Activating FLASH SPEED (EXTREME RISK)...",
-                Time = 3,
-            })
-            
+            autoBuySelectedSeedCoroutine = task.spawn(function()
+                local ReplicatedStorage = game:GetService("ReplicatedStorage")
+                local BuySeedStockEvent = ReplicatedStorage:WaitForChild("GameEvents", 10):WaitForChild("BuySeedStock", 10)
+
+                if not BuySeedStockEvent then
+                    Toggles.AutoBuySelectedSeed:SetValue(false)
+                    return
+                end
+
+                while Toggles.AutoBuySelectedSeed.Value do
+                    local selectedSeed = Options.SelectedSeed.Value
+                    if not selectedSeed then
+                        Toggles.AutoBuySelectedSeed:SetValue(false)
+                        break
+                    end
+
+                    if BuySeedStockEvent and BuySeedStockEvent.Parent then
+                        pcall(BuySeedStockEvent.FireServer, BuySeedStockEvent, selectedSeed)
+                    else
+                        Toggles.AutoBuySelectedSeed:SetValue(false)
+                        break
+                    end
+                    task.wait(0)
+                end
+            end)
+
+        end
+    end,
+})
+
+ShopGroupBox:AddToggle("AutoBuyItemA", {
+    Text = "ออโต้ซื้อเมล็ดระดับต่ำ",
+    Tooltip = "ซื้อ Item A โดยอัตโนมัติด้วยความเร็วสูงสุด เสี่ยงต่อการตรวจจับสูงมาก!",
+    Default = false,
+    Callback = function(Value)
+        if Value then
             autoBuyLowLevelSeedsCoroutine = task.spawn(function()
                 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-                local BuySeedStockEvent = nil
-                local successEvent, eventResult = pcall(function()
-                    BuySeedStockEvent = ReplicatedStorage:WaitForChild("GameEvents", 10):WaitForChild("BuySeedStock", 10)
-                end)
+                local BuySeedStockEvent = ReplicatedStorage:WaitForChild("GameEvents", 10):WaitForChild("BuySeedStock", 10)
 
-                if not successEvent or not BuySeedStockEvent then
-                    warn("Failed to find BuySeedStock event. Auto-buy stopped.")
-                    Library:Notify({
-                        Title = "Error",
-                        Description = "Failed to find buy event. Auto-buy stopped.",
-                        Time = 5,
-                    })
+                if not BuySeedStockEvent then
                     Toggles.AutoBuyItemA:SetValue(false)
                     return
                 end
@@ -114,123 +148,75 @@ ShopGroupBox:AddToggle("AutoBuyItemA", {
 
                 while Toggles.AutoBuyItemA.Value do
                     for _, seedName in ipairs(seedsToBuy) do
-                        if not Toggles.AutoBuyItemA.Value then break end 
-                        
+                        if not Toggles.AutoBuyItemA.Value then break end
+
                         if BuySeedStockEvent and BuySeedStockEvent.Parent then
                             pcall(BuySeedStockEvent.FireServer, BuySeedStockEvent, seedName)
                         else
-                            warn("BuySeedStock event no longer exists. Stopping auto-buy.")
                             Toggles.AutoBuyItemA:SetValue(false)
                             break
                         end
-                        task.wait(0) 
+                        task.wait(0)
                     end
-                    task.wait(0) 
+                    task.wait(0)
                 end
-                print("Auto-buy low level seeds stopped.")
             end)
 
-        else
-            Library:Notify({
-                Title = "Shop",
-                Description = "Auto-Buy Item A DISABLED!",
-                Time = 3,
-            })
         end
     end,
 })
 
 ShopGroupBox:AddToggle("AutoBuyItemB", {
-    Text = "ออโต้ซื้อเมล็ดระดับสูง (FLASH SPEED)",
-    Tooltip = "Automatically buys high-level seeds at maximum speed. EXTREME RISK OF DETECTION!",
+    Text = "ออโต้ซื้อเมล็ดระดับสูง",
+    Tooltip = "ซื้อเมล็ดระดับสูงโดยอัตโนมัติด้วยความเร็วสูงสุด เสี่ยงต่อการตรวจจับสูงมาก!",
     Default = false,
     Callback = function(Value)
-        print("[cb] Auto-Buy Item B changed to:", Value)
         if Value then
-            Library:Notify({
-                Title = "Shop",
-                Description = "Auto-Buy Item B ENABLED! Activating FLASH SPEED (EXTREME RISK)...",
-                Time = 3,
-            })
-            
             autoBuyHighLevelSeedsCoroutine = task.spawn(function()
                 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-                local BuySeedStockEvent = nil
-                local successEvent, eventResult = pcall(function()
-                    BuySeedStockEvent = ReplicatedStorage:WaitForChild("GameEvents", 10):WaitForChild("BuySeedStock", 10)
-                end)
+                local BuySeedStockEvent = ReplicatedStorage:WaitForChild("GameEvents", 10):WaitForChild("BuySeedStock", 10)
 
-                if not successEvent or not BuySeedStockEvent then
-                    warn("Failed to find BuySeedStock event for high-level seeds. Auto-buy stopped.")
-                    Library:Notify({
-                        Title = "Error",
-                        Description = "Failed to find buy event for high-level seeds. Auto-buy stopped.",
-                        Time = 5,
-                    })
+                if not BuySeedStockEvent then
                     Toggles.AutoBuyItemB:SetValue(false)
                     return
                 end
 
                 local highLevelSeedsToBuy = {
-                    "Pineapple", "Kiwi", "Bell Pepper", "Prickly Pear", 
+                    "Pineapple", "Kiwi", "Bell Pepper", "Prickly Pear",
                     "Loquat", "Feijoa", "Sugar Apple"
                 }
 
-                while Toggles.AutoBuyItemB.Value do 
+                while Toggles.AutoBuyItemB.Value do
                     for _, seedName in ipairs(highLevelSeedsToBuy) do
-                        if not Toggles.AutoBuyItemB.Value then break end 
-                        
+                        if not Toggles.AutoBuyItemB.Value then break end
+
                         if BuySeedStockEvent and BuySeedStockEvent.Parent then
                             pcall(BuySeedStockEvent.FireServer, BuySeedStockEvent, seedName)
                         else
-                            warn("BuySeedStock event no longer exists for high-level seeds. Stopping auto-buy.")
                             Toggles.AutoBuyItemB:SetValue(false)
                             break
                         end
-                        task.wait(0) 
+                        task.wait(0)
                     end
-                    task.wait(0) 
+                    task.wait(0)
                 end
-                print("Auto-buy high level seeds stopped.")
             end)
 
-        else
-            Library:Notify({
-                Title = "Shop",
-                Description = "Auto-Buy Item B DISABLED!",
-                Time = 3,
-            })
         end
     end,
 })
 
 ShopGroupBox:AddToggle("AutoBuyAllSeeds", {
-    Text = "ออโต้ซื้อทุกเมล็ด (FLASH SPEED)",
-    Tooltip = "Automatically buys all known seeds at maximum speed. EXTREME RISK OF DETECTION!",
+    Text = "ออโต้ซื้อทุกเมล็ด",
+    Tooltip = "ซื้อเมล็ดที่รู้จักทั้งหมดโดยอัตโนมัติด้วยความเร็วสูงสุด เสี่ยงต่อการตรวจจับสูงมาก!",
     Default = false,
     Callback = function(Value)
-        print("[cb] Auto-Buy All Seeds changed to:", Value)
         if Value then
-            Library:Notify({
-                Title = "Shop",
-                Description = "Auto-Buy All Seeds ENABLED! Activating FLASH SPEED (EXTREME RISK)...",
-                Time = 3,
-            })
-            
             autoBuyAllSeedsCoroutine = task.spawn(function()
                 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-                local BuySeedStockEvent = nil
-                local successEvent, eventResult = pcall(function()
-                    BuySeedStockEvent = ReplicatedStorage:WaitForChild("GameEvents", 10):WaitForChild("BuySeedStock", 10)
-                end)
+                local BuySeedStockEvent = ReplicatedStorage:WaitForChild("GameEvents", 10):WaitForChild("BuySeedStock", 10)
 
-                if not successEvent or not BuySeedStockEvent then
-                    warn("Failed to find BuySeedStock event for all seeds. Auto-buy stopped.")
-                    Library:Notify({
-                        Title = "Error",
-                        Description = "Failed to find buy event for all seeds. Auto-buy stopped.",
-                        Time = 5,
-                    })
+                if not BuySeedStockEvent then
                     Toggles.AutoBuyAllSeeds:SetValue(false)
                     return
                 end
@@ -238,67 +224,97 @@ ShopGroupBox:AddToggle("AutoBuyAllSeeds", {
                 local allSeedsToBuy = {
                     "Carrot", "Strawberry", "Blueberry", "Tomato", "Cauliflower",
                     "Watermelon", "Green Apple", "Avocado", "Banana",
-                    "Pineapple", "Kiwi", "Bell Pepper", "Prickly Pear", 
+                    "Pineapple", "Kiwi", "Bell Pepper", "Prickly Pear",
                     "Loquat", "Feijoa", "Sugar Apple"
                 }
 
                 while Toggles.AutoBuyAllSeeds.Value do
                     for _, seedName in ipairs(allSeedsToBuy) do
-                        if not Toggles.AutoBuyAllSeeds.Value then break end 
-                        
+                        if not Toggles.AutoBuyAllSeeds.Value then break end
+
                         if BuySeedStockEvent and BuySeedStockEvent.Parent then
                             pcall(BuySeedStockEvent.FireServer, BuySeedStockEvent, seedName)
                         else
-                            warn("BuySeedStock event no longer exists for all seeds. Stopping auto-buy.")
                             Toggles.AutoBuyAllSeeds:SetValue(false)
                             break
                         end
-                        task.wait(0) 
+                        task.wait(0)
                     end
-                    task.wait(0) 
+                    task.wait(0)
                 end
-                print("Auto-buy all seeds stopped.")
             end)
 
-        else
-            Library:Notify({
-                Title = "Shop",
-                Description = "Auto-Buy All Seeds DISABLED!",
-                Time = 3,
-            })
         end
     end,
 })
 
---- เพิ่ม Toggle ใหม่สำหรับซื้อเกียร์ทั้งหมด ---
-GearShopGroupBox:AddToggle("AutoBuyAllGear", {
-    Text = "ออโต้ซื้อเกียร์ทั้งหมด (FLASH SPEED)",
-    Tooltip = "Automatically buys all known gear at maximum speed. EXTREME RISK OF DETECTION!",
+---
+local allGearList = {
+    "Watering Can", "Trowel", "Recall Wrench", "Basic Sprinkler",
+    "Advanced Sprinkler", "Godly Sprinkler", "Tanning Mirror",
+    "Master Sprinkler", "Cleaning Spray",
+    "Favorite Tool",
+    "Harvest Tool",
+    "Friendship Pot"
+}
+
+GearShopGroupBox:AddDropdown("SelectedGear", {
+    Text = "เลือกเกียร์ที่จะซื้อ",
+    Tooltip = "เลือกเกียร์เพื่อซื้ออัตโนมัติ",
+    Default = "Watering Can",
+    Values = allGearList,
+    Callback = function(Value)
+    end,
+})
+
+GearShopGroupBox:AddToggle("AutoBuySelectedGear", {
+    Text = "ออโต้ซื้อเกียร์ที่เลือก",
+    Tooltip = "ซื้อเกียร์ที่เลือกโดยอัตโนมัติด้วยความเร็วสูงสุด เสี่ยงต่อการตรวจจับสูงมาก!",
     Default = false,
     Callback = function(Value)
-        print("[cb] Auto-Buy All Gear changed to:", Value)
         if Value then
-            Library:Notify({
-                Title = "Shop",
-                Description = "Auto-Buy All Gear ENABLED! Activating FLASH SPEED (EXTREME RISK)...",
-                Time = 3,
-            })
-            
+            autoBuySelectedGearCoroutine = task.spawn(function()
+                local ReplicatedStorage = game:GetService("ReplicatedStorage")
+                local BuyGearStockEvent = ReplicatedStorage:WaitForChild("GameEvents", 10):WaitForChild("BuyGearStock", 10)
+
+                if not BuyGearStockEvent then
+                    Toggles.AutoBuySelectedGear:SetValue(false)
+                    return
+                end
+
+                while Toggles.AutoBuySelectedGear.Value do
+                    local selectedGear = Options.SelectedGear.Value
+                    if not selectedGear then
+                        Toggles.AutoBuySelectedGear:SetValue(false)
+                        break
+                    end
+
+                    if BuyGearStockEvent and BuyGearStockEvent.Parent then
+                        pcall(BuyGearStockEvent.FireServer, BuyGearStockEvent, selectedGear)
+                    else
+                        Toggles.AutoBuySelectedGear:SetValue(false)
+                        break
+                    end
+                    task.wait(0)
+                end
+            end)
+
+        end
+    end,
+})
+
+
+GearShopGroupBox:AddToggle("AutoBuyAllGear", {
+    Text = "ออโต้ซื้อเกียร์ทั้งหมด",
+    Tooltip = "ซื้อเกียร์ที่รู้จักทั้งหมดโดยอัตโนมัติด้วยความเร็วสูงสุด เสี่ยงต่อการตรวจจับสูงมาก!",
+    Default = false,
+    Callback = function(Value)
+        if Value then
             autoBuyAllGearCoroutine = task.spawn(function()
                 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-                local BuyGearStockEvent = nil
-                local successEvent, eventResult = pcall(function()
-                    -- รอ Event "BuyGearStock"
-                    BuyGearStockEvent = ReplicatedStorage:WaitForChild("GameEvents", 10):WaitForChild("BuyGearStock", 10)
-                end)
+                local BuyGearStockEvent = ReplicatedStorage:WaitForChild("GameEvents", 10):WaitForChild("BuyGearStock", 10)
 
-                if not successEvent or not BuyGearStockEvent then
-                    warn("Failed to find BuyGearStock event. Auto-buy stopped.")
-                    Library:Notify({
-                        Title = "Error",
-                        Description = "Failed to find buy gear event. Auto-buy stopped.",
-                        Time = 5,
-                    })
+                if not BuyGearStockEvent then
                     Toggles.AutoBuyAllGear:SetValue(false)
                     return
                 end
@@ -306,58 +322,196 @@ GearShopGroupBox:AddToggle("AutoBuyAllGear", {
                 local allGearToBuy = {
                     "Watering Can", "Trowel", "Recall Wrench", "Basic Sprinkler",
                     "Advanced Sprinkler", "Godly Sprinkler", "Tanning Mirror",
-                    "Master Sprinkler", "Cleaning Spray"
+                    "Master Sprinkler", "Cleaning Spray",
+                    "Favorite Tool",
+                    "Harvest Tool",
+                    "Friendship Pot"
                 }
 
                 while Toggles.AutoBuyAllGear.Value do
                     for _, gearName in ipairs(allGearToBuy) do
-                        if not Toggles.AutoBuyAllGear.Value then break end 
-                        
+                        if not Toggles.AutoBuyAllGear.Value then break end
+
                         if BuyGearStockEvent and BuyGearStockEvent.Parent then
                             pcall(BuyGearStockEvent.FireServer, BuyGearStockEvent, gearName)
                         else
-                            warn("BuyGearStock event no longer exists. Stopping auto-buy.")
                             Toggles.AutoBuyAllGear:SetValue(false)
                             break
                         end
-                        task.wait(0) 
+                        task.wait(0)
                     end
-                    task.wait(0) 
+                    task.wait(0)
                 end
-                print("Auto-buy all gear stopped.")
             end)
 
-        else
-            Library:Notify({
-                Title = "Shop",
-                Description = "Auto-Buy All Gear DISABLED!",
-                Time = 3,
-            })
         end
     end,
 })
---- สิ้นสุด Toggle ใหม่สำหรับซื้อเกียร์ทั้งหมด ---
+
+---
+local allEggsInGameList = {}
+local u3_DataService = nil
+local PetEggData_Module = nil
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local successModuleLoad, errModuleLoad = pcall(function()
+    u3_DataService = require(ReplicatedStorage.Modules.DataService)
+    PetEggData_Module = require(ReplicatedStorage.Data.PetEggData)
+end)
+
+if not successModuleLoad then
+    warn("Failed to load DataService or PetEggData Modules:", errModuleLoad)
+    allEggsInGameList = {
+        "Common Egg", "Common Summer Egg", "Uncommon Egg", "Rare Egg",
+        "Rare Summer Egg", "Legendary Egg", "Mythical Egg", "Bug Egg"
+    }
+else
+    for eggName, eggInfo in pairs(PetEggData_Module) do
+        if typeof(eggName) == "string" and typeof(eggInfo) == "table" and eggInfo.EggName then
+            table.insert(allEggsInGameList, eggInfo.EggName)
+        end
+    end
+    table.sort(allEggsInGameList)
+end
+
+local eggCurrentShopSlots = {}
+
+local function updateEggShopContent()
+    if not u3_DataService then
+        return
+    end
+
+    local data = u3_DataService:GetData()
+    if data and data.PetEggStock and data.PetEggStock.Stocks then
+        for k in pairs(eggCurrentShopSlots) do
+            eggCurrentShopSlots[k] = nil
+        end
+
+        for slotId, stockInfo in pairs(data.PetEggStock.Stocks) do
+            eggCurrentShopSlots[slotId] = {
+                EggName = stockInfo.EggName,
+                SlotId = slotId
+            }
+        end
+    end
+end
+
+if u3_DataService then
+    local petEggStockSignal = u3_DataService:GetPathSignal("PetEggStock")
+    if petEggStockSignal then
+        petEggStockSignal:Connect(updateEggShopContent)
+    end
+    local petEggStockAllSignal = u3_DataService:GetPathSignal("PetEggStock/@")
+    if petEggStockAllSignal then
+        petEggStockAllSignal:Connect(updateEggShopContent)
+    end
+
+    updateEggShopContent()
+end
+
+
+EggShopGroupBox:AddDropdown("SelectedEggTypeToBuy", {
+    Text = "เลือกชนิดไข่ที่จะซื้อ",
+    Tooltip = "เลือกประเภทไข่ที่ต้องการให้สคริปต์ซื้อเมื่อเจอ",
+    Default = allEggsInGameList[1] or "Common Egg",
+    Values = allEggsInGameList,
+    Callback = function(Value)
+    end,
+})
+
+EggShopGroupBox:AddToggle("AutoBuySpecificEggType", {
+    Text = "ออโต้ซื้อไข่ชนิดที่เลือก",
+    Tooltip = "ซื้อไข่ชนิดที่เลือกโดยอัตโนมัติเมื่อปรากฏในสล็อตใดๆ เสี่ยงต่อการตรวจจับสูงมาก!",
+    Default = false,
+    Callback = function(Value)
+        if Value then
+            autoBuySpecificEggTypeCoroutine = task.spawn(function()
+                local GameEvents = ReplicatedStorage:WaitForChild("GameEvents", 10)
+                local BuyPetEggEvent = GameEvents:WaitForChild("BuyPetEgg", 10)
+
+                if not BuyPetEggEvent then
+                    Toggles.AutoBuySpecificEggType:SetValue(false)
+                    return
+                end
+
+                while Toggles.AutoBuySpecificEggType.Value do
+                    local desiredEggType = Options.SelectedEggTypeToBuy.Value
+
+                    for slotId, eggData in pairs(eggCurrentShopSlots) do
+                        if eggData.EggName == desiredEggType then
+                            if BuyPetEggEvent and BuyPetEggEvent.Parent then
+                                pcall(BuyPetEggEvent.FireServer, BuyPetEggEvent, eggData.SlotId)
+                            else
+                                Toggles.AutoBuySpecificEggType:SetValue(false)
+                                break
+                            end
+                        end
+                    end
+                    task.wait(0)
+                end
+            end)
+
+        end
+    end,
+})
+
+---
+
+EggShopGroupBox:AddToggle("AutoBuyAllEggsInShop", {
+    Text = "ออโต้ซื้อไข่ทั้งหมดในร้านค้า",
+    Tooltip = "ซื้อไข่ทุกชนิดที่ปรากฏในสล็อตของร้านค้าโดยอัตโนมัติ (สล็อต 1, 2, 3) เสี่ยงสูง!",
+    Default = false,
+    Callback = function(Value)
+        if Value then
+            autoBuyAllEggsInShopCoroutine = task.spawn(function()
+                local GameEvents = ReplicatedStorage:WaitForChild("GameEvents", 10)
+                local BuyPetEggEvent = GameEvents:WaitForChild("BuyPetEgg", 10)
+
+                if not BuyPetEggEvent then
+                    Toggles.AutoBuyAllEggsInShop:SetValue(false)
+                    return
+                end
+
+                while Toggles.AutoBuyAllEggsInShop.Value do
+                    for slotId = 1, 3 do
+                        local eggData = eggCurrentShopSlots[slotId]
+                        if eggData and eggData.EggName ~= "Unknown" then
+                            if BuyPetEggEvent and BuyPetEggEvent.Parent then
+                                pcall(BuyPetEggEvent.FireServer, BuyPetEggEvent, eggData.SlotId)
+                            else
+                                Toggles.AutoBuyAllEggsInShop:SetValue(false)
+                                break
+                            end
+                        end
+                    end
+                    task.wait(0)
+                end
+            end)
+
+        end
+    end,
+})
 
 ---
 local MenuGroup = Tabs["UI Settings"]:AddLeftGroupbox("Menu", "wrench")
 
 MenuGroup:AddToggle("KeybindMenuOpen", {
     Default = Library.KeybindFrame.Visible,
-    Text = "Open Keybind Menu",
+    Text = "เปิดเมนู Keybind",
     Callback = function(value)
         Library.KeybindFrame.Visible = value
     end,
 })
 MenuGroup:AddToggle("ShowCustomCursor", {
-    Text = "Custom Cursor",
+    Text = "เมาส์กำหนดเอง",
     Default = true,
     Callback = function(Value)
         Library.ShowCustomCursor = Value
     end,
 })
 MenuGroup:AddDivider()
-MenuGroup:AddLabel("Menu bind")
-    :AddKeyPicker("MenuKeybind", { Default = "RightShift", NoUI = true, Text = "Menu keybind" })
+MenuGroup:AddLabel("ปุ่มเปิด/ปิดเมนู")
+    :AddKeyPicker("MenuKeybind", { Default = "RightShift", NoUI = true, Text = "ปุ่มเปิด/ปิดเมนู" })
 
 Library.ToggleKeybind = Options.MenuKeybind
 
@@ -370,7 +524,7 @@ SaveManager:SetFolder("MyScriptHub/specific-game")
 SaveManager:SetSubFolder("specific-place")
 
 SaveManager:BuildConfigSection(Tabs["UI Settings"])
-ThemeManager:ApplyToTab(Tabs["UI Settings"]) 
+ThemeManager:ApplyToTab(Tabs["UI Settings"])
 
 SaveManager:LoadAutoloadConfig()
 
