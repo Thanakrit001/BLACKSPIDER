@@ -36,6 +36,8 @@ local Window = Library:CreateWindow({
 
 local Tabs = {
     Main = Window:AddTab("Main", "user"),
+    -- Add the new "Automatic" tab here, after "Main"
+    Automatic = Window:AddTab("Automatic", "auto_awesome"), -- Using a relevant icon, you can change this
     Shop = Window:AddTab("Shop", "shopping_cart"),
     ["UI Settings"] = Window:AddTab("UI Settings", "settings"),
 }
@@ -492,6 +494,24 @@ EggShopGroupBox:AddToggle("AutoBuyAllEggsInShop", {
     end,
 })
 
+---
+-- New "Automatic" Tab Content
+local AutomaticGroupBox = Tabs.Automatic:AddLeftGroupbox("Automatic Settings", "settings_ethernet") -- Using a relevant icon
+
+AutomaticGroupBox:AddLabel("นี่คือตัวอย่างปุ่มสำหรับแท็บ 'Automatic'")
+AutomaticGroupBox:AddToggle("ExampleAutomaticToggle", {
+    Text = "เปิดใช้งานคุณสมบัติอัตโนมัติ",
+    Tooltip = "เปิดใช้งานคุณสมบัติอัตโนมัติที่นี่",
+    Default = false,
+    Callback = function(Value)
+        -- Add your automatic feature logic here
+        if Value then
+            print("Automatic feature enabled!")
+        else
+            print("Automatic feature disabled.")
+        end
+    end,
+})
 ---
 local MenuGroup = Tabs["UI Settings"]:AddLeftGroupbox("Menu", "wrench")
 
