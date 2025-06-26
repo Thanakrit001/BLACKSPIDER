@@ -446,7 +446,7 @@ EggShopGroupBox:AddDropdown("SelectedEggs", {
 })
 
 EggShopGroupBox:AddToggle("AutoBuySelectedEggs", {
-    Text = "ออโต้ซื้อไข่ชนิดที่เลือก",
+    Text = "ออโต้ซื้อไข่ที่เลือก",
     Default = false,
     Callback = function(Value)
         if Value then
@@ -501,7 +501,7 @@ EggShopGroupBox:AddToggle("AutoBuySelectedEggs", {
 })
 
 EggShopGroupBox:AddToggle("AutoBuyAllEggsInShop", {
-    Text = "ออโต้ซื้อไข่ทั้งหมดในร้านค้า",
+    Text = "ออโต้ซื้อไข่ทั้งหมด",
     Default = false,
     Callback = function(Value)
         if Value then
