@@ -1,1 +1,23 @@
+local whitelist = {
+    "RTNserver",
+    "ICESUEPITSUEDA",
+}
+
+local localPlayer = game.Players.LocalPlayer
+
+if localPlayer then
+    local isWhitelisted = false
+    for _, whitelistedName in pairs(whitelist) do
+        if localPlayer.Name == whitelistedName then
+            isWhitelisted = true
+            break
+        end
+    end
+
+    if isWhitelisted then
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/Thanakrit001/BLACKSPIDER/refs/heads/main/Scripts"))()
+    else
+        localPlayer:Kick("มึงไม่มีชื่ออยู่ใน Whitelist นะไอ่กระชอก")
+    end
+end
 
