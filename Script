@@ -62,8 +62,8 @@ Library:OnUnload(function()
 end)
 
 local ShopGroupBox = Tabs.Shop:AddLeftGroupbox("Seed Shop Event", "box")
-local GearShopGroupBox = Tabs.Shop:AddRightGroupbox("Gear Shop Event", "box")
-local EggShopGroupBox = Tabs.Shop:AddLeftGroupbox("Egg Shop Event", "egg")
+local GearShopGroupBox = Tabs.Shop:AddRightGroupbox("Gear Shop", "box")
+local EggShopGroupBox = Tabs.Shop:AddLeftGroupbox("Egg Shop", "egg")
 
 local autoBuyLowLevelSeedsCoroutine = nil
 local autoBuyHighLevelSeedsCoroutine = nil
