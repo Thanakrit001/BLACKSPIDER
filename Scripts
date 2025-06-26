@@ -45,7 +45,6 @@ local LeftGroupBox = Tabs.Main:AddLeftGroupbox("Groupbox", "boxes")
 
 LeftGroupBox:AddToggle("MyToggle", {
     Text = "นี่คือปุ่มสลับ",
-    Tooltip = "นี่คือคำแนะนำ",
     Default = true,
     Visible = true,
     Risky = false,
@@ -61,20 +60,19 @@ Toggles.MyToggle:SetValue(false)
 Library:OnUnload(function()
 end)
 
----
 local ShopGroupBox = Tabs.Shop:AddLeftGroupbox("Seed Shop Event", "box")
-local GearShopGroupBox = Tabs.Shop:AddRightGroupbox("Gear Shop Event", "box") -- ย้ายไปฝั่งขวา
+local GearShopGroupBox = Tabs.Shop:AddRightGroupbox("Gear Shop Event", "box")
 local EggShopGroupBox = Tabs.Shop:AddLeftGroupbox("Egg Shop Event", "egg")
 
 local autoBuyLowLevelSeedsCoroutine = nil
 local autoBuyHighLevelSeedsCoroutine = nil
 local autoBuyAllSeedsCoroutine = nil
-local autoBuySelectedSeedCoroutine = nil -- ใช้สำหรับ AutoBuySelectedSeeds
-local autoBuySelectedGearCoroutine = nil -- ใช้สำหรับ AutoBuySelectedGears
+local autoBuySelectedSeedCoroutine = nil
+local autoBuySelectedGearCoroutine = nil
 local autoBuyAllGearCoroutine = nil
-local autoBuySpecificEggTypeCoroutine = nil -- ใช้สำหรับ AutoBuySelectedEggs
+local autoBuySpecificEggTypeCoroutine = nil
 local autoBuyAllEggsInShopCoroutine = nil
-local autoCraftGearCoroutine = nil -- สำหรับ Auto Craft Gear
+local autoCraftGearCoroutine = nil
 
 local allSeedsList = {
     "Carrot", "Strawberry", "Blueberry", "Tomato", "Cauliflower",
@@ -83,25 +81,20 @@ local allSeedsList = {
     "Loquat", "Feijoa", "Sugar Apple"
 }
 
---- **ส่วนที่แก้ไขสำหรับเมล็ดพืช (Seeds) โดยใช้ Multi-select Dropdown** ---
 ShopGroupBox:AddDropdown("SelectedSeeds", {
     Text = "เลือกเมล็ดที่จะซื้อ",
-    Tooltip = "เลือกเมล็ดพืชหลายชนิดเพื่อซื้ออัตโนมัติ",
     Values = allSeedsList,
-    Default = { -- กำหนดค่าเริ่มต้นเป็นตาราง
-        Carrot = false, -- ตัวอย่าง: ตั้งค่า Carrot เป็น false ในตอนแรก
+    Default = {
+        Carrot = false,
         Strawberry = false,
     },
-    Multi = true, -- สำคัญมาก: เปิดใช้งานโหมดเลือกหลายรายการ
+    Multi = true,
     Callback = function(Value)
-        -- ไม่จำเป็นต้องทำอะไรมากที่นี่ เพราะค่าจะถูกดึงไปใช้ตอน Toggle เปิด
-        -- Value จะเป็นตาราง เช่น { Carrot = true, Blueberry = false, ... }
     end,
 })
 
 ShopGroupBox:AddToggle("AutoBuySelectedSeeds", {
     Text = "ออโต้ซื้อเมล็ดที่เลือก",
-    Tooltip = "ซื้อเมล็ดที่เลือกโดยอัตโนมัติด้วยความเร็วสูงสุด เสี่ยงต่อการตรวจจับสูงมาก!",
     Default = false,
     Callback = function(Value)
         if Value then
@@ -118,7 +111,6 @@ ShopGroupBox:AddToggle("AutoBuySelectedSeeds", {
                     local selectedSeedsTable = Options.SelectedSeeds.Value
                     local seedsToBuy = {}
 
-                    -- วนลูปในตารางที่ได้จาก dropdown เพื่อดูว่าเลือกอะไรไปบ้าง
                     for seedName, isSelected in pairs(selectedSeedsTable) do
                         if isSelected == true then
                             table.insert(seedsToBuy, seedName)
@@ -126,7 +118,6 @@ ShopGroupBox:AddToggle("AutoBuySelectedSeeds", {
                     end
 
                     if #seedsToBuy == 0 then
-                        -- Library:Notify("ข้อผิดพลาด", "โปรดเลือกเมล็ดที่ต้องการซื้ออย่างน้อยหนึ่งชนิด!", 3)
                         Toggles.AutoBuySelectedSeeds:SetValue(false)
                         break
                     end
@@ -140,13 +131,12 @@ ShopGroupBox:AddToggle("AutoBuySelectedSeeds", {
                             Toggles.AutoBuySelectedSeeds:SetValue(false)
                             break
                         end
-                        task.wait(0) -- เว้นวรรคเล็กน้อยเพื่อลดความเสี่ยง
+                        task.wait(0)
                     end
                     task.wait(0)
                 end
             end)
         else
-            -- เมื่อปิด Toggle ให้ยกเลิก Coroutine
             if autoBuySelectedSeedCoroutine then
                 task.cancel(autoBuySelectedSeedCoroutine)
                 autoBuySelectedSeedCoroutine = nil
@@ -154,11 +144,9 @@ ShopGroupBox:AddToggle("AutoBuySelectedSeeds", {
         end
     end,
 })
---- **สิ้นสุดส่วนที่แก้ไขสำหรับเมล็ดพืช** ---
 
 ShopGroupBox:AddToggle("AutoBuyItemA", {
     Text = "ออโต้ซื้อเมล็ดระดับต่ำ",
-    Tooltip = "ซื้อ Item A โดยอัตโนมัติด้วยความเร็วสูงสุด เสี่ยงต่อการตรวจจับสูงมาก!",
     Default = false,
     Callback = function(Value)
         if Value then
@@ -198,7 +186,6 @@ ShopGroupBox:AddToggle("AutoBuyItemA", {
 
 ShopGroupBox:AddToggle("AutoBuyItemB", {
     Text = "ออโต้ซื้อเมล็ดระดับสูง",
-    Tooltip = "ซื้อเมล็ดระดับสูงโดยอัตโนมัติด้วยความเร็วสูงสุด เสี่ยงต่อการตรวจจับสูงมาก!",
     Default = false,
     Callback = function(Value)
         if Value then
@@ -238,7 +225,6 @@ ShopGroupBox:AddToggle("AutoBuyItemB", {
 
 ShopGroupBox:AddToggle("AutoBuyAllSeeds", {
     Text = "ออโต้ซื้อทุกเมล็ด",
-    Tooltip = "ซื้อเมล็ดที่รู้จักทั้งหมดโดยอัตโนมัติด้วยความเร็วสูงสุด เสี่ยงต่อการตรวจจับสูงมาก!",
     Default = false,
     Callback = function(Value)
         if Value then
@@ -278,7 +264,6 @@ ShopGroupBox:AddToggle("AutoBuyAllSeeds", {
     end,
 })
 
----
 local allGearList = {
     "Watering Can", "Trowel", "Recall Wrench", "Basic Sprinkler",
     "Advanced Sprinkler", "Godly Sprinkler", "Tanning Mirror",
@@ -288,20 +273,17 @@ local allGearList = {
     "Friendship Pot"
 }
 
---- **ส่วนที่แก้ไขสำหรับเกียร์ (Gear) โดยใช้ Multi-select Dropdown** ---
 GearShopGroupBox:AddDropdown("SelectedGears", {
     Text = "เลือกเกียร์ที่จะซื้อ",
-    Tooltip = "เลือกเกียร์หลายชนิดเพื่อซื้ออัตโนมัติ",
     Values = allGearList,
-    Default = {}, -- ค่าเริ่มต้นเป็นตารางว่างเปล่า หรือกำหนดรายการที่ต้องการให้เลือกไว้
-    Multi = true, -- สำคัญมาก: เปิดใช้งานโหมดเลือกหลายรายการ
+    Default = {},
+    Multi = true,
     Callback = function(Value)
     end,
 })
 
 GearShopGroupBox:AddToggle("AutoBuySelectedGears", {
     Text = "ออโต้ซื้อเกียร์ที่เลือก",
-    Tooltip = "ซื้อเกียร์ที่เลือกโดยอัตโนมัติด้วยความเร็วสูงสุด เสี่ยงต่อการตรวจจับสูงมาก!",
     Default = false,
     Callback = function(Value)
         if Value then
@@ -351,11 +333,9 @@ GearShopGroupBox:AddToggle("AutoBuySelectedGears", {
         end
     end,
 })
---- **สิ้นสุดส่วนที่แก้ไขสำหรับเกียร์** ---
 
 GearShopGroupBox:AddToggle("AutoBuyAllGear", {
     Text = "ออโต้ซื้อเกียร์ทั้งหมด",
-    Tooltip = "ซื้อเกียร์ที่รู้จักทั้งหมดโดยอัตโนมัติด้วยความเร็วสูงสุด เสี่ยงต่อการตรวจจับสูงมาก!",
     Default = false,
     Callback = function(Value)
         if Value then
@@ -397,7 +377,6 @@ GearShopGroupBox:AddToggle("AutoBuyAllGear", {
     end,
 })
 
----
 local allEggsInGameList = {}
 local u3_DataService = nil
 local PetEggData_Module = nil
@@ -409,7 +388,6 @@ local successModuleLoad, errModuleLoad = pcall(function()
 end)
 
 if not successModuleLoad then
-    warn("Failed to load DataService or PetEggData Modules:", errModuleLoad)
     allEggsInGameList = {
         "Common Egg", "Common Summer Egg", "Uncommon Egg", "Rare Egg",
         "Rare Summer Egg", "Legendary Egg", "Mythical Egg", "Bug Egg"
@@ -458,20 +436,17 @@ if u3_DataService then
     updateEggShopContent()
 end
 
---- **ส่วนที่แก้ไขสำหรับไข่ (Eggs) โดยใช้ Multi-select Dropdown** ---
 EggShopGroupBox:AddDropdown("SelectedEggs", {
     Text = "เลือกชนิดไข่ที่จะซื้อ",
-    Tooltip = "เลือกประเภทไข่หลายชนิดที่ต้องการให้สคริปต์ซื้อเมื่อเจอ",
     Values = allEggsInGameList,
-    Default = {}, -- ค่าเริ่มต้นเป็นตารางว่างเปล่า
-    Multi = true, -- สำคัญมาก: เปิดใช้งานโหมดเลือกหลายรายการ
+    Default = {},
+    Multi = true,
     Callback = function(Value)
     end,
 })
 
 EggShopGroupBox:AddToggle("AutoBuySelectedEggs", {
     Text = "ออโต้ซื้อไข่ชนิดที่เลือก",
-    Tooltip = "ซื้อไข่ชนิดที่เลือกโดยอัตโนมัติเมื่อปรากฏในสล็อตใดๆ เสี่ยงต่อการตรวจจับสูงมาก!",
     Default = false,
     Callback = function(Value)
         if Value then
@@ -524,13 +499,9 @@ EggShopGroupBox:AddToggle("AutoBuySelectedEggs", {
         end
     end,
 })
---- **สิ้นสุดส่วนที่แก้ไขสำหรับไข่** ---
-
----
 
 EggShopGroupBox:AddToggle("AutoBuyAllEggsInShop", {
     Text = "ออโต้ซื้อไข่ทั้งหมดในร้านค้า",
-    Tooltip = "ซื้อไข่ทุกชนิดที่ปรากฏในสล็อตของร้านค้าโดยอัตโนมัติ (สล็อต 1, 2, 3) เสี่ยงสูง!",
     Default = false,
     Callback = function(Value)
         if Value then
@@ -567,19 +538,11 @@ local AutomaticGroupBox = Tabs.Automatic:AddLeftGroupbox("Auto Collection", "set
 
 AutomaticGroupBox:AddToggle("ExampleAutomaticToggle", {
     Text = "ออโต้เก็บผล",
-    Tooltip = "เปิดใช้งานคุณสมบัติอัตโนมัติที่นี่",
     Default = false,
     Callback = function(Value)
-        if Value then
-            print("Automatic feature enabled!")
-        else
-            print("Automatic feature disabled.")
-        end
     end,
 })
 
----
---- **ส่วน Auto Craft Gear แยกออกมา** ---
 local AutoCraftGearGroupBox = Tabs.Automatic:AddRightGroupbox("Auto Craft Gear", "build")
 
 local allCraftableGears = {
@@ -600,18 +563,15 @@ local allCraftableGears = {
 
 AutoCraftGearGroupBox:AddDropdown("SelectedGearsToCraft", {
     Text = "เลือกเกียร์ที่จะคราฟอัตโนมัติ",
-    -- Tooltip = "เลือกเกียร์ที่ต้องการคราฟอัตโนมัติ", -- Removed tooltip
     Values = allCraftableGears,
-    Default = allCraftableGears[1], -- Set default to the first item for single-select
-    Multi = false, -- Changed to single-select dropdown
+    Default = allCraftableGears[1],
+    Multi = false,
     Callback = function(Value)
-        -- Value will now be a single string (the selected gear name)
     end,
 })
 
 AutoCraftGearGroupBox:AddToggle("AutoCraftSelectedGears", {
     Text = "ออโต้คราฟเกียร์ที่เลือก",
-    Tooltip = "คราฟเกียร์ที่เลือกโดยอัตโนมัติด้วยความเร็วสูงสุด เสี่ยงต่อการตรวจจับสูงมาก!",
     Default = false,
     Callback = function(Value)
         if Value then
@@ -620,13 +580,12 @@ AutoCraftGearGroupBox:AddToggle("AutoCraftSelectedGears", {
                 local EventCraftingWorkBench = workspace:WaitForChild("Interaction", 10):WaitForChild("UpdateItems", 10):WaitForChild("CraftingTables", 10):WaitForChild("EventCraftingWorkBench", 10)
 
                 if not CraftingGlobalObjectService or not EventCraftingWorkBench then
-                    warn("Required instances for crafting not found. Auto-crafting stopped.")
                     Toggles.AutoCraftSelectedGears:SetValue(false)
                     return
                 end
 
                 while Toggles.AutoCraftSelectedGears.Value do
-                    local selectedGearName = Options.SelectedGearsToCraft.Value -- Get the single selected value
+                    local selectedGearName = Options.SelectedGearsToCraft.Value
 
                     if not selectedGearName or selectedGearName == "" then
                         Library:Notify("ข้อผิดพลาด", "โปรดเลือกเกียร์ที่ต้องการคราฟ!", 3)
@@ -634,15 +593,14 @@ AutoCraftGearGroupBox:AddToggle("AutoCraftSelectedGears", {
                         break
                     end
 
-                    -- Dynamic FireServer call for the single selected gear
                     local args = {
                         "SetRecipe",
                         EventCraftingWorkBench,
                         "GearEventWorkbench",
-                        selectedGearName -- Use the single selected gear name
+                        selectedGearName
                     }
                     pcall(CraftingGlobalObjectService.FireServer, CraftingGlobalObjectService, unpack(args))
-                    task.wait(0) -- Small delay to reduce risk
+                    task.wait(0)
                 end
             end)
         else
@@ -653,9 +611,7 @@ AutoCraftGearGroupBox:AddToggle("AutoCraftSelectedGears", {
         end
     end,
 })
---- **สิ้นสุดส่วน Auto Craft Gear แยกออกมา** ---
 
----
 local MenuGroup = Tabs["UI Settings"]:AddLeftGroupbox("Menu", "wrench")
 
 MenuGroup:AddToggle("KeybindMenuOpen", {
@@ -693,13 +649,4 @@ SaveManager:LoadAutoloadConfig()
 
 
 local uiCorner = Instance.new("UICorner")
---uiCorner.Parent = toggleButton -- ไม่ได้ประกาศ toggleButton ในโค้ดที่ให้มา
 uiCorner.CornerRadius = UDim.new(0, 8)
-
--- เนื่องจาก toggleButton ไม่ได้ประกาศไว้ จึงไม่สามารถเชื่อมต่อ MouseButton1Click หรือตั้งค่า Visible ได้
-
--- Window:OnVisibilityChanged(function(isVisible)
---     toggleButton.Visible = not isVisible
--- end)
-
--- toggleButton.Visible = not Window.Visible
