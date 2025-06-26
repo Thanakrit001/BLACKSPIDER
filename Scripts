@@ -36,8 +36,7 @@ local Window = Library:CreateWindow({
 
 local Tabs = {
     Main = Window:AddTab("Main", "user"),
-    -- Add the new "Automatic" tab here, after "Main"
-    Automatic = Window:AddTab("Automatic", "auto_awesome"), -- Using a relevant icon, you can change this
+    Automatic = Window:AddTab("Automatic", "auto_awesome"),
     Shop = Window:AddTab("Shop", "shopping_cart"),
     ["UI Settings"] = Window:AddTab("UI Settings", "settings"),
 }
@@ -64,17 +63,18 @@ end)
 
 ---
 local ShopGroupBox = Tabs.Shop:AddLeftGroupbox("Seed Shop Event", "box")
-local GearShopGroupBox = Tabs.Shop:AddLeftGroupbox("Gear Shop Event", "box")
+local GearShopGroupBox = Tabs.Shop:AddRightGroupbox("Gear Shop Event", "box") -- ย้ายไปฝั่งขวา
 local EggShopGroupBox = Tabs.Shop:AddLeftGroupbox("Egg Shop Event", "egg")
 
 local autoBuyLowLevelSeedsCoroutine = nil
 local autoBuyHighLevelSeedsCoroutine = nil
 local autoBuyAllSeedsCoroutine = nil
-local autoBuySelectedSeedCoroutine = nil
-local autoBuySelectedGearCoroutine = nil
+local autoBuySelectedSeedCoroutine = nil -- ใช้สำหรับ AutoBuySelectedSeeds
+local autoBuySelectedGearCoroutine = nil -- ใช้สำหรับ AutoBuySelectedGears
 local autoBuyAllGearCoroutine = nil
-local autoBuySpecificEggTypeCoroutine = nil
+local autoBuySpecificEggTypeCoroutine = nil -- ใช้สำหรับ AutoBuySelectedEggs
 local autoBuyAllEggsInShopCoroutine = nil
+local autoCraftGearCoroutine = nil -- สำหรับ Auto Craft Gear
 
 local allSeedsList = {
     "Carrot", "Strawberry", "Blueberry", "Tomato", "Cauliflower",
@@ -83,16 +83,23 @@ local allSeedsList = {
     "Loquat", "Feijoa", "Sugar Apple"
 }
 
-ShopGroupBox:AddDropdown("SelectedSeed", {
+--- **ส่วนที่แก้ไขสำหรับเมล็ดพืช (Seeds) โดยใช้ Multi-select Dropdown** ---
+ShopGroupBox:AddDropdown("SelectedSeeds", {
     Text = "เลือกเมล็ดที่จะซื้อ",
-    Tooltip = "เลือกเมล็ดพืชเพื่อซื้ออัตโนมัติ",
-    Default = "Carrot",
+    Tooltip = "เลือกเมล็ดพืชหลายชนิดเพื่อซื้ออัตโนมัติ",
     Values = allSeedsList,
+    Default = { -- กำหนดค่าเริ่มต้นเป็นตาราง
+        Carrot = false, -- ตัวอย่าง: ตั้งค่า Carrot เป็น false ในตอนแรก
+        Strawberry = false,
+    },
+    Multi = true, -- สำคัญมาก: เปิดใช้งานโหมดเลือกหลายรายการ
     Callback = function(Value)
+        -- ไม่จำเป็นต้องทำอะไรมากที่นี่ เพราะค่าจะถูกดึงไปใช้ตอน Toggle เปิด
+        -- Value จะเป็นตาราง เช่น { Carrot = true, Blueberry = false, ... }
     end,
 })
 
-ShopGroupBox:AddToggle("AutoBuySelectedSeed", {
+ShopGroupBox:AddToggle("AutoBuySelectedSeeds", {
     Text = "ออโต้ซื้อเมล็ดที่เลือก",
     Tooltip = "ซื้อเมล็ดที่เลือกโดยอัตโนมัติด้วยความเร็วสูงสุด เสี่ยงต่อการตรวจจับสูงมาก!",
     Default = false,
@@ -103,30 +110,51 @@ ShopGroupBox:AddToggle("AutoBuySelectedSeed", {
                 local BuySeedStockEvent = ReplicatedStorage:WaitForChild("GameEvents", 10):WaitForChild("BuySeedStock", 10)
 
                 if not BuySeedStockEvent then
-                    Toggles.AutoBuySelectedSeed:SetValue(false)
+                    Toggles.AutoBuySelectedSeeds:SetValue(false)
                     return
                 end
 
-                while Toggles.AutoBuySelectedSeed.Value do
-                    local selectedSeed = Options.SelectedSeed.Value
-                    if not selectedSeed then
-                        Toggles.AutoBuySelectedSeed:SetValue(false)
+                while Toggles.AutoBuySelectedSeeds.Value do
+                    local selectedSeedsTable = Options.SelectedSeeds.Value
+                    local seedsToBuy = {}
+
+                    -- วนลูปในตารางที่ได้จาก dropdown เพื่อดูว่าเลือกอะไรไปบ้าง
+                    for seedName, isSelected in pairs(selectedSeedsTable) do
+                        if isSelected == true then
+                            table.insert(seedsToBuy, seedName)
+                        end
+                    end
+
+                    if #seedsToBuy == 0 then
+                        -- Library:Notify("ข้อผิดพลาด", "โปรดเลือกเมล็ดที่ต้องการซื้ออย่างน้อยหนึ่งชนิด!", 3)
+                        Toggles.AutoBuySelectedSeeds:SetValue(false)
                         break
                     end
 
-                    if BuySeedStockEvent and BuySeedStockEvent.Parent then
-                        pcall(BuySeedStockEvent.FireServer, BuySeedStockEvent, selectedSeed)
-                    else
-                        Toggles.AutoBuySelectedSeed:SetValue(false)
-                        break
+                    for _, seedName in ipairs(seedsToBuy) do
+                        if not Toggles.AutoBuySelectedSeeds.Value then break end
+
+                        if BuySeedStockEvent and BuySeedStockEvent.Parent then
+                            pcall(BuySeedStockEvent.FireServer, BuySeedStockEvent, seedName)
+                        else
+                            Toggles.AutoBuySelectedSeeds:SetValue(false)
+                            break
+                        end
+                        task.wait(0) -- เว้นวรรคเล็กน้อยเพื่อลดความเสี่ยง
                     end
                     task.wait(0)
                 end
             end)
-
+        else
+            -- เมื่อปิด Toggle ให้ยกเลิก Coroutine
+            if autoBuySelectedSeedCoroutine then
+                task.cancel(autoBuySelectedSeedCoroutine)
+                autoBuySelectedSeedCoroutine = nil
+            end
         end
     end,
 })
+--- **สิ้นสุดส่วนที่แก้ไขสำหรับเมล็ดพืช** ---
 
 ShopGroupBox:AddToggle("AutoBuyItemA", {
     Text = "ออโต้ซื้อเมล็ดระดับต่ำ",
@@ -260,16 +288,18 @@ local allGearList = {
     "Friendship Pot"
 }
 
-GearShopGroupBox:AddDropdown("SelectedGear", {
+--- **ส่วนที่แก้ไขสำหรับเกียร์ (Gear) โดยใช้ Multi-select Dropdown** ---
+GearShopGroupBox:AddDropdown("SelectedGears", {
     Text = "เลือกเกียร์ที่จะซื้อ",
-    Tooltip = "เลือกเกียร์เพื่อซื้ออัตโนมัติ",
-    Default = "Watering Can",
+    Tooltip = "เลือกเกียร์หลายชนิดเพื่อซื้ออัตโนมัติ",
     Values = allGearList,
+    Default = {}, -- ค่าเริ่มต้นเป็นตารางว่างเปล่า หรือกำหนดรายการที่ต้องการให้เลือกไว้
+    Multi = true, -- สำคัญมาก: เปิดใช้งานโหมดเลือกหลายรายการ
     Callback = function(Value)
     end,
 })
 
-GearShopGroupBox:AddToggle("AutoBuySelectedGear", {
+GearShopGroupBox:AddToggle("AutoBuySelectedGears", {
     Text = "ออโต้ซื้อเกียร์ที่เลือก",
     Tooltip = "ซื้อเกียร์ที่เลือกโดยอัตโนมัติด้วยความเร็วสูงสุด เสี่ยงต่อการตรวจจับสูงมาก!",
     Default = false,
@@ -280,31 +310,48 @@ GearShopGroupBox:AddToggle("AutoBuySelectedGear", {
                 local BuyGearStockEvent = ReplicatedStorage:WaitForChild("GameEvents", 10):WaitForChild("BuyGearStock", 10)
 
                 if not BuyGearStockEvent then
-                    Toggles.AutoBuySelectedGear:SetValue(false)
+                    Toggles.AutoBuySelectedGears:SetValue(false)
                     return
                 end
 
-                while Toggles.AutoBuySelectedGear.Value do
-                    local selectedGear = Options.SelectedGear.Value
-                    if not selectedGear then
-                        Toggles.AutoBuySelectedGear:SetValue(false)
+                while Toggles.AutoBuySelectedGears.Value do
+                    local selectedGearsTable = Options.SelectedGears.Value
+                    local gearsToBuy = {}
+
+                    for gearName, isSelected in pairs(selectedGearsTable) do
+                        if isSelected == true then
+                            table.insert(gearsToBuy, gearName)
+                        end
+                    end
+
+                    if #gearsToBuy == 0 then
+                        Toggles.AutoBuySelectedGears:SetValue(false)
                         break
                     end
 
-                    if BuyGearStockEvent and BuyGearStockEvent.Parent then
-                        pcall(BuyGearStockEvent.FireServer, BuyGearStockEvent, selectedGear)
-                    else
-                        Toggles.AutoBuySelectedGear:SetValue(false)
-                        break
+                    for _, gearName in ipairs(gearsToBuy) do
+                        if not Toggles.AutoBuySelectedGears.Value then break end
+
+                        if BuyGearStockEvent and BuyGearStockEvent.Parent then
+                            pcall(BuyGearStockEvent.FireServer, BuyGearStockEvent, gearName)
+                        else
+                            Toggles.AutoBuySelectedGears:SetValue(false)
+                            break
+                        end
+                        task.wait(0)
                     end
                     task.wait(0)
                 end
             end)
-
+        else
+            if autoBuySelectedGearCoroutine then
+                task.cancel(autoBuySelectedGearCoroutine)
+                autoBuySelectedGearCoroutine = nil
+            end
         end
     end,
 })
-
+--- **สิ้นสุดส่วนที่แก้ไขสำหรับเกียร์** ---
 
 GearShopGroupBox:AddToggle("AutoBuyAllGear", {
     Text = "ออโต้ซื้อเกียร์ทั้งหมด",
@@ -411,17 +458,18 @@ if u3_DataService then
     updateEggShopContent()
 end
 
-
-EggShopGroupBox:AddDropdown("SelectedEggTypeToBuy", {
+--- **ส่วนที่แก้ไขสำหรับไข่ (Eggs) โดยใช้ Multi-select Dropdown** ---
+EggShopGroupBox:AddDropdown("SelectedEggs", {
     Text = "เลือกชนิดไข่ที่จะซื้อ",
-    Tooltip = "เลือกประเภทไข่ที่ต้องการให้สคริปต์ซื้อเมื่อเจอ",
-    Default = allEggsInGameList[1] or "Common Egg",
+    Tooltip = "เลือกประเภทไข่หลายชนิดที่ต้องการให้สคริปต์ซื้อเมื่อเจอ",
     Values = allEggsInGameList,
+    Default = {}, -- ค่าเริ่มต้นเป็นตารางว่างเปล่า
+    Multi = true, -- สำคัญมาก: เปิดใช้งานโหมดเลือกหลายรายการ
     Callback = function(Value)
     end,
 })
 
-EggShopGroupBox:AddToggle("AutoBuySpecificEggType", {
+EggShopGroupBox:AddToggle("AutoBuySelectedEggs", {
     Text = "ออโต้ซื้อไข่ชนิดที่เลือก",
     Tooltip = "ซื้อไข่ชนิดที่เลือกโดยอัตโนมัติเมื่อปรากฏในสล็อตใดๆ เสี่ยงต่อการตรวจจับสูงมาก!",
     Default = false,
@@ -432,30 +480,51 @@ EggShopGroupBox:AddToggle("AutoBuySpecificEggType", {
                 local BuyPetEggEvent = GameEvents:WaitForChild("BuyPetEgg", 10)
 
                 if not BuyPetEggEvent then
-                    Toggles.AutoBuySpecificEggType:SetValue(false)
+                    Toggles.AutoBuySelectedEggs:SetValue(false)
                     return
                 end
 
-                while Toggles.AutoBuySpecificEggType.Value do
-                    local desiredEggType = Options.SelectedEggTypeToBuy.Value
+                while Toggles.AutoBuySelectedEggs.Value do
+                    local selectedEggsTable = Options.SelectedEggs.Value
+                    local eggsToBuy = {}
 
-                    for slotId, eggData in pairs(eggCurrentShopSlots) do
-                        if eggData.EggName == desiredEggType then
-                            if BuyPetEggEvent and BuyPetEggEvent.Parent then
-                                pcall(BuyPetEggEvent.FireServer, BuyPetEggEvent, eggData.SlotId)
-                            else
-                                Toggles.AutoBuySpecificEggType:SetValue(false)
-                                break
+                    for eggName, isSelected in pairs(selectedEggsTable) do
+                        if isSelected == true then
+                            table.insert(eggsToBuy, eggName)
+                        end
+                    end
+
+                    if #eggsToBuy == 0 then
+                        Toggles.AutoBuySelectedEggs:SetValue(false)
+                        break
+                    end
+
+                    for _, desiredEggType in ipairs(eggsToBuy) do
+                        if not Toggles.AutoBuySelectedEggs.Value then break end
+
+                        for slotId, eggData in pairs(eggCurrentShopSlots) do
+                            if eggData.EggName == desiredEggType then
+                                if BuyPetEggEvent and BuyPetEggEvent.Parent then
+                                    pcall(BuyPetEggEvent.FireServer, BuyPetEggEvent, eggData.SlotId)
+                                else
+                                    Toggles.AutoBuySelectedEggs:SetValue(false)
+                                    break
+                                end
                             end
                         end
                     end
                     task.wait(0)
                 end
             end)
-
+        else
+            if autoBuySpecificEggTypeCoroutine then
+                task.cancel(autoBuySpecificEggTypeCoroutine)
+                autoBuySpecificEggTypeCoroutine = nil
+            end
         end
     end,
 })
+--- **สิ้นสุดส่วนที่แก้ไขสำหรับไข่** ---
 
 ---
 
@@ -494,17 +563,13 @@ EggShopGroupBox:AddToggle("AutoBuyAllEggsInShop", {
     end,
 })
 
----
--- New "Automatic" Tab Content
-local AutomaticGroupBox = Tabs.Automatic:AddLeftGroupbox("Automatic Settings", "settings_ethernet") -- Using a relevant icon
+local AutomaticGroupBox = Tabs.Automatic:AddLeftGroupbox("Auto Collection", "settings_ethernet")
 
-AutomaticGroupBox:AddLabel("นี่คือตัวอย่างปุ่มสำหรับแท็บ 'Automatic'")
 AutomaticGroupBox:AddToggle("ExampleAutomaticToggle", {
-    Text = "เปิดใช้งานคุณสมบัติอัตโนมัติ",
+    Text = "ออโต้เก็บผล",
     Tooltip = "เปิดใช้งานคุณสมบัติอัตโนมัติที่นี่",
     Default = false,
     Callback = function(Value)
-        -- Add your automatic feature logic here
         if Value then
             print("Automatic feature enabled!")
         else
@@ -512,6 +577,84 @@ AutomaticGroupBox:AddToggle("ExampleAutomaticToggle", {
         end
     end,
 })
+
+---
+--- **ส่วน Auto Craft Gear แยกออกมา** ---
+local AutoCraftGearGroupBox = Tabs.Automatic:AddRightGroupbox("Auto Craft Gear", "build")
+
+local allCraftableGears = {
+    "Lightning Rod",
+    "Reclaimer",
+    "Tropical Mist Sprinkler",
+    "Berry Blusher Sprinkler",
+    "Spice Spritzer Sprinkler",
+    "Flower Froster Sprinkler",
+    "Stalk Sprout Sprinkler",
+    "Mutation Spray Choc",
+    "Mutation Spray Pollinated",
+    "Mutation Spray Shocked",
+    "Honey Crafters Crate",
+    "Anti Bee Egg",
+    "Pack Bee"
+}
+
+AutoCraftGearGroupBox:AddDropdown("SelectedGearsToCraft", {
+    Text = "เลือกเกียร์ที่จะคราฟอัตโนมัติ",
+    -- Tooltip = "เลือกเกียร์ที่ต้องการคราฟอัตโนมัติ", -- Removed tooltip
+    Values = allCraftableGears,
+    Default = allCraftableGears[1], -- Set default to the first item for single-select
+    Multi = false, -- Changed to single-select dropdown
+    Callback = function(Value)
+        -- Value will now be a single string (the selected gear name)
+    end,
+})
+
+AutoCraftGearGroupBox:AddToggle("AutoCraftSelectedGears", {
+    Text = "ออโต้คราฟเกียร์ที่เลือก",
+    Tooltip = "คราฟเกียร์ที่เลือกโดยอัตโนมัติด้วยความเร็วสูงสุด เสี่ยงต่อการตรวจจับสูงมาก!",
+    Default = false,
+    Callback = function(Value)
+        if Value then
+            autoCraftGearCoroutine = task.spawn(function()
+                local CraftingGlobalObjectService = game:GetService("ReplicatedStorage"):WaitForChild("GameEvents", 10):WaitForChild("CraftingGlobalObjectService", 10)
+                local EventCraftingWorkBench = workspace:WaitForChild("Interaction", 10):WaitForChild("UpdateItems", 10):WaitForChild("CraftingTables", 10):WaitForChild("EventCraftingWorkBench", 10)
+
+                if not CraftingGlobalObjectService or not EventCraftingWorkBench then
+                    warn("Required instances for crafting not found. Auto-crafting stopped.")
+                    Toggles.AutoCraftSelectedGears:SetValue(false)
+                    return
+                end
+
+                while Toggles.AutoCraftSelectedGears.Value do
+                    local selectedGearName = Options.SelectedGearsToCraft.Value -- Get the single selected value
+
+                    if not selectedGearName or selectedGearName == "" then
+                        Library:Notify("ข้อผิดพลาด", "โปรดเลือกเกียร์ที่ต้องการคราฟ!", 3)
+                        Toggles.AutoCraftSelectedGears:SetValue(false)
+                        break
+                    end
+
+                    -- Dynamic FireServer call for the single selected gear
+                    local args = {
+                        "SetRecipe",
+                        EventCraftingWorkBench,
+                        "GearEventWorkbench",
+                        selectedGearName -- Use the single selected gear name
+                    }
+                    pcall(CraftingGlobalObjectService.FireServer, CraftingGlobalObjectService, unpack(args))
+                    task.wait(0) -- Small delay to reduce risk
+                end
+            end)
+        else
+            if autoCraftGearCoroutine then
+                task.cancel(autoCraftGearCoroutine)
+                autoCraftGearCoroutine = nil
+            end
+        end
+    end,
+})
+--- **สิ้นสุดส่วน Auto Craft Gear แยกออกมา** ---
+
 ---
 local MenuGroup = Tabs["UI Settings"]:AddLeftGroupbox("Menu", "wrench")
 
@@ -549,35 +692,14 @@ ThemeManager:ApplyToTab(Tabs["UI Settings"])
 SaveManager:LoadAutoloadConfig()
 
 
----
-local player = game.Players.LocalPlayer
-local playerGui = player:WaitForChild("PlayerGui")
-
-local toggleGui = Instance.new("ScreenGui")
-toggleGui.Name = "ToggleUIBtnGui"
-toggleGui.ResetOnSpawn = false
-toggleGui.Parent = playerGui
-
-local toggleButton = Instance.new("ImageButton")
-toggleButton.Name = "ToggleButton"
-toggleButton.Parent = toggleGui
-toggleButton.Size = UDim2.new(0, 50, 0, 50)
-toggleButton.Position = UDim2.new(0.95, -50, 0.05, 0)
-toggleButton.BackgroundTransparency = 1
-toggleButton.Image = "rbxassetid://131071604680337"
-toggleButton.ImageTransparency = 0
-toggleButton.ZIndex = 10
-
 local uiCorner = Instance.new("UICorner")
-uiCorner.Parent = toggleButton
+--uiCorner.Parent = toggleButton -- ไม่ได้ประกาศ toggleButton ในโค้ดที่ให้มา
 uiCorner.CornerRadius = UDim.new(0, 8)
 
-toggleButton.MouseButton1Click:Connect(function()
-    Window:Toggle()
-end)
+-- เนื่องจาก toggleButton ไม่ได้ประกาศไว้ จึงไม่สามารถเชื่อมต่อ MouseButton1Click หรือตั้งค่า Visible ได้
 
-Window:OnVisibilityChanged(function(isVisible)
-    toggleButton.Visible = not isVisible
-end)
+-- Window:OnVisibilityChanged(function(isVisible)
+--     toggleButton.Visible = not isVisible
+-- end)
 
-toggleButton.Visible = not Window.Visible
+-- toggleButton.Visible = not Window.Visible
