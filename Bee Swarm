@@ -1,0 +1,152 @@
+-- example script by https://github.com/mstudio45/LinoriaLib/blob/main/Example.lua and modified by deivid
+-- You can suggest changes with a pull request or something
+
+local repo = "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/"
+local Library = loadstring(game:HttpGet(repo .. "Library.lua"))()
+local ThemeManager = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))()
+local SaveManager = loadstring(game:HttpGet(repo .. "addons/SaveManager.lua"))()
+
+local Options = Library.Options
+local Toggles = Library.Toggles
+
+Library.ForceCheckbox = false
+Library.ShowToggleFrameInKeybinds = true
+
+local Window = Library:CreateWindow({
+	Title = "BLACKSPIDER",
+	Footer = "version: beta",
+	Icon = 131071604680337,
+	NotifySide = "Right", -- Keep this if you want notifications for other parts of the UI, otherwise remove this line as well
+	ShowCustomCursor = true,
+})
+
+local Tabs = {
+	Main = Window:AddTab("Main", "user"),
+	["UI Settings"] = Window:AddTab("UI Settings", "settings"),
+}
+
+-- Groupbox สำหรับ Dispensers
+local DispenserGroup = Tabs.Main:AddLeftGroupbox("Dispensers", "box")
+
+-- Groupbox สำหรับ Boosters
+local BoosterGroup = Tabs.Main:AddRightGroupbox("Boosters", "package")
+
+-- ตารางเก็บ Toggles ของ Dispensers ทั้งหมด (ยกเว้น Toggle All ตัวมันเอง)
+local allDispensers = {}
+-- ตารางเก็บ Toggles ของ Boosters ทั้งหมด (ยกเว้น Toggle All ตัวมันเอง)
+local allBoosters = {}
+
+-- Function to fire the event
+local function fireToyEvent(itemName, value)
+    if value then -- ถ้า toggle ถูกเปิด
+        game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("ToyEvent"):FireServer(itemName)
+    end
+end
+
+-- Function เพื่อสร้าง Toggle และเก็บ reference ไว้ในตารางที่ถูกต้อง
+local function addDispenserBoosterToggle(groupbox, name, targetTable, defaultState)
+    local toggle = groupbox:AddToggle(name:gsub(" ", ""), { -- ใช้ชื่อที่ไม่มีช่องว่างสำหรับ Index
+        Text = name,
+        Default = defaultState or false,
+        Tooltip = "Toggles " .. name .. " event.",
+        Callback = function(value)
+            fireToyEvent(name, value)
+        end,
+    })
+    table.insert(targetTable, toggle) -- เพิ่ม toggle เข้าไปในตารางรวมที่ถูกต้อง
+    return toggle
+}
+
+-- Add Toggles for each Dispenser
+addDispenserBoosterToggle(DispenserGroup, "Honey Dispenser", allDispensers)
+addDispenserBoosterToggle(DispenserGroup, "Free Ant Pass Dispenser", allDispensers)
+addDispenserBoosterToggle(DispenserGroup, "Blueberry Dispenser", allDispensers)
+addDispenserBoosterToggle(DispenserGroup, "Coconut Dispenser", allDispensers)
+addDispenserBoosterToggle(DispenserGroup, "Glue Dispenser", allDispensers)
+addDispenserBoosterToggle(DispenserGroup, "Strawberry Dispenser", allDispensers)
+addDispenserBoosterToggle(DispenserGroup, "Treat Dispenser", allDispensers)
+addDispenserBoosterToggle(DispenserGroup, "Wealth Clock", allDispensers)
+
+-- ปุ่ม "Toggle All" สำหรับ Dispensers (เป็น Toggle)
+DispenserGroup:AddToggle("ToggleAllDispensers", {
+    Text = "Toggle All Dispensers",
+    Default = false,
+    Tooltip = "Toggles all individual Dispenser options ON or OFF.",
+    Callback = function(value)
+        for _, toggle in ipairs(allDispensers) do
+            if toggle.Value ~= value then
+                toggle:SetValue(value)
+            end
+        end
+    end,
+})
+
+-- Add Toggles for Boosters
+addDispenserBoosterToggle(BoosterGroup, "Sprout Summoner", allBoosters)
+addDispenserBoosterToggle(BoosterGroup, "Honeystorm", allBoosters)
+addDispenserBoosterToggle(BoosterGroup, "Blue Field Booster", allBoosters)
+addDispenserBoosterToggle(BoosterGroup, "Field Booster", allBoosters)
+addDispenserBoosterToggle(BoosterGroup, "Red Field Booster", allBoosters)
+
+-- ปุ่ม "Toggle All" สำหรับ Boosters (เป็น Toggle)
+BoosterGroup:AddToggle("ToggleAllBoosters", {
+    Text = "Toggle All Boosters",
+    Default = false,
+    Tooltip = "Toggles all individual Booster options ON or OFF.",
+    Callback = function(value)
+        for _, toggle in ipairs(allBoosters) do
+            if toggle.Value ~= value then
+                toggle:SetValue(value)
+            end
+        end
+    end,
+})
+
+local MenuGroup = Tabs["UI Settings"]:AddLeftGroupbox("Menu", "wrench")
+
+MenuGroup:AddToggle("KeybindMenuOpen", {
+	Default = Library.KeybindFrame.Visible,
+	Text = "Open Keybind Menu",
+	Callback = function(value)
+		Library.KeybindFrame.Visible = value
+	end,
+})
+MenuGroup:AddDropdown("DPIDropdown", {
+	Values = { "50%", "75%", "100%", "125%", "150%", "175%", "200%" },
+	Default = "100%",
+
+	Text = "DPI Scale",
+
+	Callback = function(Value)
+		Value = Value:gsub("%%", "")
+		local DPI = tonumber(Value)
+
+		Library:SetDPIScale(DPI)
+	end,
+})
+MenuGroup:AddDivider()
+MenuGroup:AddLabel("Menu bind")
+	:AddKeyPicker("MenuKeybind", { Default = "RightShift", NoUI = true, Text = "Menu keybind" })
+
+MenuGroup:AddButton("Unload", function()
+	Library:Unload()
+end)
+
+Library.ToggleKeybind = Options.MenuKeybind
+
+ThemeManager:SetLibrary(Library)
+SaveManager:SetLibrary(Library)
+
+SaveManager:IgnoreThemeSettings()
+
+SaveManager:SetIgnoreIndexes({ "MenuKeybind" })
+
+ThemeManager:SetFolder("MyScriptHub")
+SaveManager:SetFolder("MyScriptHub/specific-game")
+SaveManager:SetSubFolder("specific-place")
+
+SaveManager:BuildConfigSection(Tabs["UI Settings"])
+
+ThemeManager:ApplyToTab(Tabs["UI Settings"])
+
+SaveManager:LoadAutoloadConfig()
