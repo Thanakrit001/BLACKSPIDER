@@ -55,7 +55,7 @@ local function addDispenserBoosterToggle(groupbox, name, targetTable, defaultSta
     })
     table.insert(targetTable, toggle) -- เพิ่ม toggle เข้าไปในตารางรวมที่ถูกต้อง
     return toggle
-}
+end
 
 -- Add Toggles for each Dispenser
 addDispenserBoosterToggle(DispenserGroup, "Honey Dispenser", allDispensers)
