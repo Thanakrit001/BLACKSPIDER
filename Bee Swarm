@@ -1,5 +1,3 @@
-
-
 local repo = "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/"
 local Library = loadstring(game:HttpGet(repo .. "Library.lua"))()
 local ThemeManager = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))()
@@ -15,7 +13,7 @@ local Window = Library:CreateWindow({
 	Title = "BLACKSPIDER",
 	Footer = "version: beta",
 	Icon = 131071604680337,
-	NotifySide = "Right", -- Keep this if you want notifications for other parts of the UI, otherwise remove this line as well
+	NotifySide = "Right",
 	ShowCustomCursor = true,
 })
 
@@ -24,27 +22,24 @@ local Tabs = {
 	["UI Settings"] = Window:AddTab("UI Settings", "settings"),
 }
 
--- Groupbox สำหรับ Dispensers
 local DispenserGroup = Tabs.Main:AddLeftGroupbox("Dispensers", "box")
 
--- Groupbox สำหรับ Boosters
 local BoosterGroup = Tabs.Main:AddRightGroupbox("Boosters", "package")
 
--- ตารางเก็บ Toggles ของ Dispensers ทั้งหมด (ยกเว้น Toggle All ตัวมันเอง)
-local allDispensers = {}
--- ตารางเก็บ Toggles ของ Boosters ทั้งหมด (ยกเว้น Toggle All ตัวมันเอง)
-local allBoosters = {}
+local MemoryMatchGroup = Tabs.Main:AddLeftGroupbox("Memory Matches", "puzzle")
 
--- Function to fire the event
+local allDispensers = {}
+local allBoosters = {}
+local allMemoryMatches = {}
+
 local function fireToyEvent(itemName, value)
-    if value then -- ถ้า toggle ถูกเปิด
+    if value then
         game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("ToyEvent"):FireServer(itemName)
     end
 end
 
--- Function เพื่อสร้าง Toggle และเก็บ reference ไว้ในตารางที่ถูกต้อง
 local function addDispenserBoosterToggle(groupbox, name, targetTable, defaultState)
-    local toggle = groupbox:AddToggle(name:gsub(" ", ""), { -- ใช้ชื่อที่ไม่มีช่องว่างสำหรับ Index
+    local toggle = groupbox:AddToggle(name:gsub(" ", ""), {
         Text = name,
         Default = defaultState or false,
         Tooltip = "Toggles " .. name .. " event.",
@@ -52,10 +47,10 @@ local function addDispenserBoosterToggle(groupbox, name, targetTable, defaultSta
             fireToyEvent(name, value)
         end,
     })
-    table.insert(targetTable, toggle) -- เพิ่ม toggle เข้าไปในตารางรวมที่ถูกต้อง
+    table.insert(targetTable, toggle)
     return toggle
 end
--- Add Toggles for each Dispenser
+
 addDispenserBoosterToggle(DispenserGroup, "Honey Dispenser", allDispensers)
 addDispenserBoosterToggle(DispenserGroup, "Free Ant Pass Dispenser", allDispensers)
 addDispenserBoosterToggle(DispenserGroup, "Blueberry Dispenser", allDispensers)
@@ -65,7 +60,6 @@ addDispenserBoosterToggle(DispenserGroup, "Strawberry Dispenser", allDispensers)
 addDispenserBoosterToggle(DispenserGroup, "Treat Dispenser", allDispensers)
 addDispenserBoosterToggle(DispenserGroup, "Wealth Clock", allDispensers)
 
--- ปุ่ม "Toggle All" สำหรับ Dispensers (เป็น Toggle)
 DispenserGroup:AddToggle("ToggleAllDispensers", {
     Text = "Toggle All Dispensers",
     Default = false,
@@ -79,14 +73,12 @@ DispenserGroup:AddToggle("ToggleAllDispensers", {
     end,
 })
 
--- Add Toggles for Boosters
 addDispenserBoosterToggle(BoosterGroup, "Sprout Summoner", allBoosters)
 addDispenserBoosterToggle(BoosterGroup, "Honeystorm", allBoosters)
 addDispenserBoosterToggle(BoosterGroup, "Blue Field Booster", allBoosters)
 addDispenserBoosterToggle(BoosterGroup, "Field Booster", allBoosters)
 addDispenserBoosterToggle(BoosterGroup, "Red Field Booster", allBoosters)
 
--- ปุ่ม "Toggle All" สำหรับ Boosters (เป็น Toggle)
 BoosterGroup:AddToggle("ToggleAllBoosters", {
     Text = "Toggle All Boosters",
     Default = false,
@@ -99,6 +91,26 @@ BoosterGroup:AddToggle("ToggleAllBoosters", {
         end
     end,
 })
+
+-- เพิ่ม "Memory Match" ธรรมดาเข้าไปด้วย
+addDispenserBoosterToggle(MemoryMatchGroup, "Memory Match", allMemoryMatches)
+addDispenserBoosterToggle(MemoryMatchGroup, "Extreme Memory Match", allMemoryMatches)
+addDispenserBoosterToggle(MemoryMatchGroup, "Mega Memory Match", allMemoryMatches)
+addDispenserBoosterToggle(MemoryMatchGroup, "Night Memory Match", allMemoryMatches)
+
+MemoryMatchGroup:AddToggle("ToggleAllMemoryMatches", {
+    Text = "Toggle All Memory Matches",
+    Default = false,
+    Tooltip = "Toggles all individual Memory Match options ON or OFF.",
+    Callback = function(value)
+        for _, toggle in ipairs(allMemoryMatches) do
+            if toggle.Value ~= value then
+                toggle:SetValue(value)
+            end
+        end
+    end,
+})
+
 
 local MenuGroup = Tabs["UI Settings"]:AddLeftGroupbox("Menu", "wrench")
 
