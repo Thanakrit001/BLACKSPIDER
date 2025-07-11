@@ -1,5 +1,4 @@
--- example script by https://github.com/mstudio45/LinoriaLib/blob/main/Example.lua and modified by deivid
--- You can suggest changes with a pull request or something
+
 
 local repo = "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/"
 local Library = loadstring(game:HttpGet(repo .. "Library.lua"))()
@@ -55,8 +54,7 @@ local function addDispenserBoosterToggle(groupbox, name, targetTable, defaultSta
     })
     table.insert(targetTable, toggle) -- เพิ่ม toggle เข้าไปในตารางรวมที่ถูกต้อง
     return toggle
-}
-
+end
 -- Add Toggles for each Dispenser
 addDispenserBoosterToggle(DispenserGroup, "Honey Dispenser", allDispensers)
 addDispenserBoosterToggle(DispenserGroup, "Free Ant Pass Dispenser", allDispensers)
